@@ -119,6 +119,13 @@ open class AnimatedImageView: UIImageView {
 
     /// Decode the GIF frames in background thread before using. It will decode frames data and do a off-screen
     /// rendering to extract pixel information in background. This can reduce the main thread CPU usage.
+    ///
+    /// - Note: This property is deprecated and no longer takes effect. It was removed because the background
+    ///   decode path could trigger an ImageIO race condition (`GlobalGIFInfo::writeToStream` crash).
+    @available(*, deprecated, message: """
+    This property does not perform as declared and may lead to performance degradation.
+    It is currently obsolete and scheduled for removal in a future version.
+    """)
     public var backgroundDecode = true
 
     /// The animation timer's run loop mode. Default is `RunLoop.Mode.common`.
@@ -288,7 +295,6 @@ open class AnimatedImageView: UIImageView {
                 preloadQueue: preloadQueue)
             animator.delegate = self
             animator.needsPrescaling = needsPrescaling
-            animator.backgroundDecode = backgroundDecode
             animator.prepareFramesAsynchronously()
             self.animator = animator
         }
@@ -409,8 +415,6 @@ extension AnimatedImageView {
 
         var needsPrescaling = true
 
-        var backgroundDecode = true
-
         weak var delegate: AnimatorDelegate?
 
         // Total duration of one animation loop
@@ -516,7 +520,7 @@ extension AnimatedImageView {
              framePreloadCount count: Int,
              repeatCount: RepeatCount,
              preloadQueue: DispatchQueue) {
-            self.frameSource = source
+            self.frameSource = source.copy()
             self.contentMode = mode
             self.size = size
             self.imageSize = imageSize
@@ -602,15 +606,7 @@ extension AnimatedImageView {
                 
                 return KFCrossPlatformImage(cgImage: unretainedImage)
             } else {
-                let image = KFCrossPlatformImage(cgImage: cgImage)
-                if backgroundDecode {
-                    guard let context = GraphicsContext.current(size: imageSize, scale: imageScale, inverting: true, cgImage: cgImage) else {
-                        return image
-                    }
-                    return image.kf.decoded(on: context)
-                } else {
-                    return image
-                }
+                return KFCrossPlatformImage(cgImage: cgImage)
             }
         }
         

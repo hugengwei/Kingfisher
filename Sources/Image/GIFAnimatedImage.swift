@@ -139,12 +139,22 @@ public protocol ImageFrameSource {
     
     /// Retrieves the duration at a specific index. If the index is invalid, implementors should return `0.0`.
     func duration(at index: Int) -> TimeInterval
+    
+    /// Creates a copy of the current `ImageFrameSource` instance.
+    ///
+    /// For `CGImageFrameSource`, this creates a new `CGImageSource` from the same data,
+    /// ensuring thread-safe concurrent access across different threads.
+    func copy() -> Self
 }
 
 public extension ImageFrameSource {
     /// Retrieves the frame at a specific index. If the index is invalid, implementors should return `nil`.
     func frame(at index: Int) -> CGImage? {
         return frame(at: index, maxSize: nil)
+    }
+    
+    func copy() -> Self {
+        return self
     }
 }
 
@@ -172,6 +182,18 @@ struct CGImageFrameSource: ImageFrameSource {
 
     func duration(at index: Int) -> TimeInterval {
         return GIFAnimatedImage.getFrameDuration(from: imageSource, at: index)
+    }
+    
+    /// Creates an independent copy backed by a new `CGImageSource` from the same data.
+    /// This avoids the `GlobalGIFInfo::writeToStream` race condition when multiple
+    /// threads decode frames from the same `CGImageSource` concurrently.
+    func copy() -> CGImageFrameSource {
+        guard let data = data,
+              let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary?)
+        else {
+            return self
+        }
+        return CGImageFrameSource(data: data, imageSource: source, options: options)
     }
 }
 
